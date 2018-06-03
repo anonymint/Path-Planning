@@ -8,6 +8,7 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
+#include "spline.h"
 
 using namespace std;
 
@@ -200,7 +201,11 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  // start at lane 1;
+  int lane = 1;
+  double ref_vel = 49.5; //mph
+
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&ref_vel, &lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -244,14 +249,89 @@ int main() {
 
             // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
             // TODO use limit_speed 49.5 mph to limit and smooth the speed by incrementally increasing it
-            double current_s = car_s;
-            double current_d = car_d;
-            for (int i=0; i<50; i++) {
-              current_s = current_s + 0.2;
-              current_d = 6;
-              vector<double> xy = getXY(current_s, current_d, map_waypoints_s, map_waypoints_x,map_waypoints_y);
-              next_x_vals.push_back(xy[0]);
-              next_y_vals.push_back(xy[1]);
+            // define initial value
+            vector<double> ptsx;
+            vector<double> ptsy;
+            double ref_x = car_x;
+            double ref_y = car_y;
+            double ref_yaw = deg2rad(car_yaw);
+            int prev_size = previous_path_x.size();
+            tk::spline s;            
+
+            if (prev_size < 2) {
+              double prev_car_x = car_x - cos(car_yaw);
+              double prev_car_y = car_y - sin(car_yaw);
+              ptsx.push_back(prev_car_x);
+              ptsx.push_back(car_x);
+
+              ptsy.push_back(prev_car_y);
+              ptsy.push_back(car_y);
+            } else {
+              ref_x = previous_path_x[prev_size-1];
+              ref_y = previous_path_y[prev_size-1];
+              double ref_x_prev = previous_path_x[prev_size-2];
+              double ref_y_prev = previous_path_y[prev_size-2];
+              ref_yaw = atan2(ref_y-ref_y_prev, ref_x-ref_x_prev);
+
+              ptsx.push_back(ref_x_prev);
+              ptsx.push_back(ref_x);
+
+              ptsy.push_back(ref_y_prev);
+              ptsy.push_back(ref_y);
+            }
+
+            vector<double> next_wp0 = getXY(car_s+30, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp1 = getXY(car_s+60, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            vector<double> next_wp2 = getXY(car_s+90, (2+4*lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+
+            ptsx.push_back(next_wp0[0]);
+            ptsx.push_back(next_wp1[0]);
+            ptsx.push_back(next_wp2[0]);
+
+            ptsy.push_back(next_wp0[1]);
+            ptsy.push_back(next_wp1[1]);
+            ptsy.push_back(next_wp2[1]);    
+
+            // transform coordinate to 0,0 and yaw 0 degree
+            for (int i = 0; i<ptsx.size(); i++) {
+              double shift_x = ptsx[i]-ref_x;
+              double shift_y = ptsy[i]-ref_y;
+              ptsx[i] = shift_x*cos(0-ref_yaw) - shift_y*sin(0-ref_yaw);
+              ptsy[i] = shift_x*sin(0-ref_yaw) + shift_y*cos(0-ref_yaw);               
+            }
+
+            s.set_points(ptsx, ptsy);
+
+            // start off with previous path if any
+            for (int i=0; i < previous_path_x.size(); i++) {
+              next_x_vals.push_back(previous_path_x[i]);
+              next_y_vals.push_back(previous_path_y[i]);
+            }
+
+            // Calculate the end of Spline at x = 30
+            double target_x = 30;
+            double target_y = s(target_x);
+            double distance = sqrt(target_x*target_x + target_y*target_y);
+            double x_add_on = 0;
+            for (int i=0; i < 50-previous_path_x.size(); i++) {
+              // 0.02 is second car will visit every .02 second 
+              // number of point ==> N * 0.02 * velocity = distance
+              // ref_vel/2.24 ==> ref_vel*0.44704 ==> convert mile/h to meter/sec
+              double N = distance/(0.02*ref_vel/2.24);
+              double x_point = x_add_on + target_x/N;
+              double y_point = s(x_point);
+
+              x_add_on = x_point;
+
+              double x_ref = x_point;
+              double y_ref = y_point;
+              //roate back to it's origin coordinate
+              // rotate back to ref_yaw and + it's ref_x,y from beginning
+              x_point = (x_ref*cos(ref_yaw) - y_ref*sin(ref_yaw)) + ref_x;
+              y_point = (x_ref*sin(ref_yaw) + y_ref*cos(ref_yaw)) + ref_y;
+
+              next_x_vals.push_back(x_point);
+              next_y_vals.push_back(y_point);   
             }
 
             //END
