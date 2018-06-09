@@ -203,9 +203,13 @@ int main() {
 
   // start at lane 1;
   int lane = 1;
-  double ref_vel = 49.5; //mph
+  double car_speed_limit = 49.5; //mph
+  double ref_vel = 0; //mph
+  double buffer_distance = 30; //meters
 
-  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&ref_vel, &lane](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+
+
+  h.onMessage([&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy,&ref_vel,&car_speed_limit, &lane, &buffer_distance](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -240,6 +244,16 @@ int main() {
           	double end_path_d = j[1]["end_path_d"];
 
           	// Sensor Fusion Data, a list of all other cars on the same side of the road.
+            /* here is sensor fusion data
+             * [ car's unique ID,
+             *   car's x position in map coordinates,
+             *   car's y position in map coordinates,
+             *   car's x velocity in m/s,
+             *   car's y velocity in m/s,
+             *   car's s position in frenet coordinates,
+             *   car's d position in frenet coordinates
+             *  ]
+             */
           	auto sensor_fusion = j[1]["sensor_fusion"];
 
           	json msgJson;
@@ -256,7 +270,38 @@ int main() {
             double ref_y = car_y;
             double ref_yaw = deg2rad(car_yaw);
             int prev_size = previous_path_x.size();
-            tk::spline s;            
+            tk::spline s;
+
+            // Sensor fusion
+            if (prev_size > 0) {
+                car_s = end_path_s;
+            }
+            bool too_close = false;
+            for (int i = 0; i < sensor_fusion.size(); ++i) {
+                float d = sensor_fusion[i][6];
+                //same lane
+                if (d < (2 + 4*lane+2) && d > (2 + 4*lane-2)) {
+                    double vx = sensor_fusion[i][3];
+                    double vy = sensor_fusion[i][4];
+                    double check_speed = sqrt(vx*vx + vy*vy);
+                    double check_car_s = sensor_fusion[i][5];
+                    check_car_s += ((double)prev_size*0.02*check_speed);
+                    if ((check_car_s > car_s) && (check_car_s-car_s < buffer_distance)) {
+                      //ref_vel = check_speed;
+                      too_close = true;
+                      car_speed_limit = check_speed;
+                    }
+                }
+            }
+
+            if (too_close) {
+              ref_vel -= 0.224;
+            } else if (ref_vel < car_speed_limit) {
+              ref_vel += 0.224;
+            } else {
+              car_speed_limit = 49.5;
+            }
+
 
             if (prev_size < 2) {
               double prev_car_x = car_x - cos(car_yaw);
