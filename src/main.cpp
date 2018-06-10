@@ -286,7 +286,7 @@ int main() {
                     double check_speed = sqrt(vx*vx + vy*vy);
                     double check_car_s = sensor_fusion[i][5];
                     check_car_s += ((double)prev_size*0.02*check_speed);
-                    if ((check_car_s > car_s) && (check_car_s-car_s < buffer_distance)) {
+                    if ((check_car_s > car_s) && (check_car_s - car_s < buffer_distance)) {
                       //ref_vel = check_speed;
                       too_close = true;
                       car_speed_limit = check_speed;
@@ -296,6 +296,57 @@ int main() {
 
             if (too_close) {
               ref_vel -= 0.224;
+
+              int new_lane = lane;
+              // ok to turn left only in lane 1 or 2
+              cout << "left check" << lane << " " << new_lane << endl;
+              if ((lane == 1 || lane == 2) && new_lane == lane) {
+                bool ok_to_turn_left = true;
+                for (int i = 0; i < sensor_fusion.size(); ++i) {
+                  float d = sensor_fusion[i][6];
+                  //same lane
+                  if (d < (2 + 4*(lane-1)+2) && d > (2 + 4*(lane-1)-2)) {
+                    double vx = sensor_fusion[i][3];
+                    double vy = sensor_fusion[i][4];
+                    double check_speed = sqrt(vx*vx + vy*vy);
+                    double current_check_car_s = sensor_fusion[i][5];
+                    double check_car_s = current_check_car_s;
+                    check_car_s += ((double)prev_size*0.02*check_speed);
+                    if ((check_car_s > car_s && check_car_s-car_s < buffer_distance)  && (abs(car_s - current_check_car_s) < buffer_distance)) {
+                      ok_to_turn_left = false;
+                      break;
+                    }
+                  }
+                }
+                new_lane = ok_to_turn_left ? lane -1 : lane;
+              }
+
+              cout << "right check " << lane << " " << new_lane  << " " << car_d  << " "<< 4.0*lane+2.0  << " " << car_d - (4*lane+2) << " " <<abs(car_d - (4*lane+2)) << endl;
+              if ((lane == 0 || lane == 1) && new_lane == lane && abs(car_d - (4*lane+2))<0.2) {
+                cout << "right loop" << lane << " " << new_lane << endl;
+                bool ok_to_turn_right = true;
+                for (int i = 0; i < sensor_fusion.size(); ++i) {
+                  float d = sensor_fusion[i][6];
+                  //same lane
+                  if (d < (2 + 4*(lane+1)+2) && d > (2 + 4*(lane+1)-2)) {
+                    double vx = sensor_fusion[i][3];
+                    double vy = sensor_fusion[i][4];
+                    double check_speed = sqrt(vx*vx + vy*vy);
+                    double current_check_car_s = sensor_fusion[i][5];
+                    double check_car_s = current_check_car_s;
+                    check_car_s += ((double)prev_size*0.02*check_speed);
+                    if ((check_car_s > car_s && check_car_s-car_s < buffer_distance)  && (abs(car_s - current_check_car_s) < buffer_distance)) {
+                      ok_to_turn_right = false;
+                      break;
+                    }
+                  }
+                }
+                new_lane = ok_to_turn_right ? lane+1 : lane;
+              }
+
+              cout << "last check" << lane << " " << new_lane << endl;
+              lane = new_lane != lane ? new_lane : lane;
+
             } else if (ref_vel < car_speed_limit) {
               ref_vel += 0.224;
             } else {
