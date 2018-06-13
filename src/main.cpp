@@ -365,6 +365,7 @@ int main() {
                 }
               }
 
+              // ok to turn right only in lane 0 or 1
               if (lane < 2 && new_lane_state == 0) {
 
                 bool is_car_front_right = isCarInRange(lane+1, sensor_fusion, car_s, buffer_distance, prev_size, map_waypoints_x, map_waypoints_y);

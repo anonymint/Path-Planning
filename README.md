@@ -3,10 +3,14 @@
 Let drive a car not just only smooth but at desired speed as much as possible.
 
 ### Goals
-In this project your goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. You will be provided the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car should try to go as close as possible to the 50 MPH speed limit, which means passing slower traffic when possible, note that other cars will try to change lanes too. The car should avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 10 m/s^3.
+In this project the goal is to safely navigate around a virtual highway with other traffic that is driving +-10 MPH of the 50 MPH speed limit. 
+
+Given the car's localization and sensor fusion data, there is also a sparse map list of waypoints around the highway. The car is running at the 50 MPH speed limit, and passing slower traffic when possible, note that other cars will try to change lanes too. 
+
+The car will avoid hitting other cars at all cost as well as driving inside of the marked road lanes at all times, unless going from one lane to another. The car should be able to make one complete loop around the 6946m highway. Since the car is trying to go 50 MPH, it should take a little over 5 minutes to complete 1 loop. Also the car should not experience total acceleration over 10 m/s^2 and jerk that is greater than 10 m/s^3.
 
 ### Simulator.
-You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).
+You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab] (https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).
 
 ## Basic Build Instructions
 
@@ -21,6 +25,12 @@ You can download the Term3 Simulator which contains the Path Planning Project fr
 
 
 ## Result
+
+I have run several simulation and here is the result of **the best time with 4.40 miles in 5:34 minutes** without any collisions and no jerk!
+
+If you want to see the full lap please refer to one of attached movies sections below
+
+![best_4mile](asset/best_4mile.png)
 
 #### Change Lane
 sample state changes from keep lane to change lane
@@ -58,6 +68,14 @@ Running from 10 to 20 miles
 ![14_mile](asset/best_14_33_mile.png)
 ![15_mile](asset/best_15_31_mile.png)
 ![20_mile](asset/best_20_22_mile.png)
+
+### Recording
+
+[Run Lap 1](asset/first_lap.mp4)
+
+[Run Lap 2](asset/second_lap.mp4)
+
+[Run Lap 3](asset/third_lap.mp4)
 
 ## Retrospective
 
