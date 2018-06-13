@@ -21,8 +21,26 @@ You can download the Term3 Simulator which contains the Path Planning Project fr
 
 ## Overview 
 
-//TODO how I do it, process and way
+To illustrate how I achieve this project, I would like to point out to the overall picture below.
 
+![Overall model](asset/behavior_control.png)
+
+The area in green line consists of all I have to implement in order to make car drive and from the top to bottom also illustrate the amount of time span for example `Behavior` part will take longest time span because it needs to cooperate all data to predict in the future compare to `Motion Control`
+
+Let look at each part
+
+##### Behavior
+By implementing, a state of the car `lane` of the car where it is then using prediction of other cars in size of `prev_size * 0.02 sec` and use this data to come up with decision whether 
+* (Constant Speed) to keep current limit speed `49.5 mph`
+* (Keep Lane) Slow down and keep lane as speed of car in front of
+* (Lane Change Left) only no car within a satisfied distant in front and behind on a left lane
+* (Lane Change Right) only no car within a satisfied distant in front and behind on a right lane
+
+##### Prediction
+//TODO
+
+##### Trajectory
+//TODO
 
 ## Result
 
