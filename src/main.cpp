@@ -167,22 +167,27 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 // This method will help to check 
 // if any cars are in front of (buffer_distance positive) 
 // or any cars are behind (buffer_distance negative)
-bool isCarInRange(const int lane, json sensor_fusion, double my_car_s, double buffer_distance, int prev_size) {
+bool isCarInRange(const int lane, const json sensor_fusion, double my_car_s, double buffer_distance, int prev_size, const vector<double> &maps_x, const vector<double> &maps_y) {
+  double middle_of_lane = 4*lane + 2;
   for (int i = 0; i < sensor_fusion.size(); ++i) {
     float d = sensor_fusion[i][6];
-    //same lane
-    double middle_of_lane = 4*lane + 2;
-    if (d < (2 + middle_of_lane) && d > (2 + middle_of_lane)) {
-      double vx = sensor_fusion[i][3];
-      double vy = sensor_fusion[i][4];
+    double x = sensor_fusion[i][1];
+    double y = sensor_fusion[i][2];
+    double vx = sensor_fusion[i][3];
+    double vy = sensor_fusion[i][4];
+    double x_future = x + ((double) prev_size * 0.02 * vx);
+    double y_future = y + ((double) prev_size * 0.02 * vy);
+    double theta = atan((y_future-y) / (x_future-x));
+    vector<double> frenet = getFrenet(x_future, y_future, theta, maps_x, maps_y);
+    //cout << "current d:"<< d << " future d:" << frenet[1] << endl;
+    if ((d < (middle_of_lane + 2) && d > (middle_of_lane - 2)) ||
+        (frenet[1] < (middle_of_lane + 2) && frenet[1] > (middle_of_lane - 2))) {
       double check_speed = sqrt(vx*vx + vy*vy);
       double current_check_car_s = sensor_fusion[i][5];
       double check_car_s = current_check_car_s;
       check_car_s += ((double)prev_size*0.02*check_speed);
-      // if buffer is positive check_car_s >= my_car_s && my_car_s + buffer > check_car_s
-      // if buffer is negative check_car_s <= my_car_s && my_car_s + buffer < check_car_s
-      if ((buffer_distance > 0 && my_car_s + buffer_distance > check_car_s) || 
-          (buffer_distance < 0 && my_car_s + buffer_distance < check_car_s)) {
+      if ((buffer_distance > 0 && check_car_s > my_car_s && my_car_s + buffer_distance > check_car_s) ||
+          (buffer_distance < 0 && check_car_s <= my_car_s && my_car_s + buffer_distance <= check_car_s)) {
         return true;
       }
     }
@@ -191,23 +196,28 @@ bool isCarInRange(const int lane, json sensor_fusion, double my_car_s, double bu
 }
 
 // get the nearest velocity of the closest car otherwise it would be itself as result
-double getVelCarNearby(const int lane, json sensor_fusion, double my_car_s, double buffer_distance, int prev_size, double my_car_vel) {
+double getVelCarNearby(const int lane, const json sensor_fusion, double my_car_s, double buffer_distance, int prev_size, double my_car_vel, const vector<double> &maps_x, const vector<double> &maps_y) {
   double velocity = my_car_vel;
+  //same lane
+  double middle_of_lane = 4*lane + 2;
   for (int i = 0; i < sensor_fusion.size(); ++i) {
     float d = sensor_fusion[i][6];
-    //same lane
-    double middle_of_lane = 4*lane + 2;
-    if (d < (2 + middle_of_lane) && d > (2 + middle_of_lane)) {
-      double vx = sensor_fusion[i][3];
-      double vy = sensor_fusion[i][4];
+    double x = sensor_fusion[i][1];
+    double y = sensor_fusion[i][2];
+    double vx = sensor_fusion[i][3];
+    double vy = sensor_fusion[i][4];
+    double x_future = x + ((double) prev_size * 0.02 * vx);
+    double y_future = y + ((double) prev_size * 0.02 * vy);
+    double theta = atan((y_future-y) / (x_future-x));
+    vector<double> frenet = getFrenet(x_future, y_future, theta, maps_x, maps_y);
+    if ((d < (middle_of_lane + 2) && d > (middle_of_lane - 2)) ||
+        (frenet[1] < (middle_of_lane + 2) && frenet[1] > (middle_of_lane - 2))) {
       double check_speed = sqrt(vx*vx + vy*vy);
       double current_check_car_s = sensor_fusion[i][5];
       double check_car_s = current_check_car_s;
       check_car_s += ((double)prev_size*0.02*check_speed);
-      // if buffer is positive check_car_s >= my_car_s && my_car_s + buffer > check_car_s
-      // if buffer is negative check_car_s <= my_car_s && my_car_s + buffer < check_car_s
-      if ((buffer_distance > 0 && my_car_s + buffer_distance > check_car_s) || 
-          (buffer_distance < 0 && my_car_s + buffer_distance < check_car_s)) {
+      if ((buffer_distance > 0 && check_car_s > my_car_s && my_car_s + buffer_distance > check_car_s) ||
+          (buffer_distance < 0 && check_car_s <= my_car_s && my_car_s + buffer_distance <= check_car_s)) {
         return check_speed;
       }
     }
@@ -312,8 +322,6 @@ int main() {
           	vector<double> next_x_vals;
           	vector<double> next_y_vals;          
 
-            // TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-            // TODO use limit_speed 49.5 mph to limit and smooth the speed by incrementally increasing it
             // define initial value
             vector<double> ptsx;
             vector<double> ptsy;
@@ -328,45 +336,44 @@ int main() {
                 car_s = end_path_s;
             }
             bool too_close = false;
-            if (isCarInRange(lane, sensor_fusion, car_s, buffer_distance, prev_size)) {
+            if (isCarInRange(lane, sensor_fusion, car_s, buffer_distance, prev_size, map_waypoints_x, map_waypoints_y)) {
               too_close = true;
-              car_speed_limit = getVelCarNearby(lane, sensor_fusion, car_s, buffer_distance, prev_size, ref_vel); 
-            }             
+              //2.24 convert m/s to mile/h
+              double car_speed_nearby = 2.24 * getVelCarNearby(lane, sensor_fusion, car_s, buffer_distance, prev_size, ref_vel, map_waypoints_x, map_waypoints_y);
+
+              car_speed_limit = max(1.0, car_speed_nearby - 3*(abs(ref_vel - car_speed_nearby))); // convert from meter/s to mile/h
+            }
 
             // state transition
             // CS -> KL -> TURN_LEFT -> CS
             //          -> TURN_RIGHT -> CS 
-            // that will loop back           
-
+            // that will loop back
             if (too_close) {
-
+              // cout << ref_vel << " " << car_speed_limit << " " << lane << endl;
               if (ref_vel > car_speed_limit) {
                 ref_vel -= 0.224;  
               }
               
               int new_lane_state = 0;
               // ok to turn left only in lane 1 or 2
-              cout << "left check" << lane << " " << new_lane_state << endl;
               if (lane > 0 && new_lane_state == 0) {
 
-                bool is_car_front_left = isCarInRange(lane-1, sensor_fusion, car_s, buffer_distance, prev_size);
-                bool is_car_behind_left = isCarInRange(lane-1, sensor_fusion, car_s, -buffer_distance/4, prev_size);
+                bool is_car_front_left = isCarInRange(lane-1, sensor_fusion, car_s, buffer_distance, prev_size, map_waypoints_x, map_waypoints_y);
+                bool is_car_behind_left = isCarInRange(lane-1, sensor_fusion, car_s, -buffer_distance/2, prev_size,map_waypoints_x, map_waypoints_y);
                 if (!is_car_behind_left && !is_car_front_left) {
                   new_lane_state = -1;
                 }
               }
 
-              cout << "right check" << lane << " " << new_lane_state << endl;
               if (lane < 2 && new_lane_state == 0) {
 
-                bool is_car_front_right = isCarInRange(lane+1, sensor_fusion, car_s, buffer_distance, prev_size);
-                bool is_car_behind_right = isCarInRange(lane+1, sensor_fusion, car_s, -buffer_distance/4, prev_size);
+                bool is_car_front_right = isCarInRange(lane+1, sensor_fusion, car_s, buffer_distance, prev_size, map_waypoints_x, map_waypoints_y);
+                bool is_car_behind_right = isCarInRange(lane+1, sensor_fusion, car_s, -buffer_distance/2, prev_size, map_waypoints_x, map_waypoints_y);
                 if (!is_car_behind_right && !is_car_front_right) {
                   new_lane_state = 1;
                 }
               }
-              
-              cout << "last check" << lane << " " << new_lane_state << endl;
+
               lane += new_lane_state;              
 
             } else if (ref_vel < car_speed_limit) {
