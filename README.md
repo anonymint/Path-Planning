@@ -97,4 +97,4 @@ Running from 10 to 20 miles
 
 ## Retrospective
 
-//TODO
+Local minimum issue where cars block lane and adjacent lane, car cannot predict in far beyond its horizon. 
