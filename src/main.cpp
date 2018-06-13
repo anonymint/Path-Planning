@@ -435,7 +435,7 @@ int main() {
             }
 
             // Calculate the end of Spline at x = 30
-            double target_x = 30;
+            double target_x = buffer_distance;
             double target_y = s(target_x);
             double distance = sqrt(target_x*target_x + target_y*target_y);
             double x_add_on = 0;
